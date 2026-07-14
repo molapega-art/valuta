@@ -28,7 +28,7 @@
   --ok:#1F9D3A;
 }
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
-html,body{height:100%;overflow:hidden}
+html,body{height:100%;overflow:hidden;touch-action:manipulation;overscroll-behavior:none}
 body{
   background:var(--bg);color:var(--text);
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
@@ -54,7 +54,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:6px
 @keyframes spin{to{transform:rotate(360deg)}}
 
 /* ── Строки валют ── */
-.rows{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;gap:9px;padding:2px 0 8px}
+.rows{flex:1;min-height:0;overflow-y:auto;touch-action:pan-y;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;gap:9px;padding:2px 0 8px}
 .row{display:flex;gap:9px;flex-shrink:0}
 .ccy{
   display:flex;align-items:center;gap:8px;
@@ -456,6 +456,15 @@ $('search').addEventListener('input', e=>buildList(e.target.value));
 entry='0'; fresh=true;
 render();
 loadRates(false);
+
+/* ── Запрет масштабирования (pinch и double-tap) ── */
+['gesturestart','gesturechange','gestureend'].forEach(ev=>{
+  document.addEventListener(ev, e=>e.preventDefault(), {passive:false});
+});
+document.addEventListener('touchmove', e=>{
+  if(e.touches.length>1) e.preventDefault();
+}, {passive:false});
+
 if('serviceWorker' in navigator){
   navigator.serviceWorker.register('./sw.js').catch(()=>{});
 }
