@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Валюты</title>
+<meta name="description" content="Конвертер валют с калькулятором и актуальными курсами">
+<meta name="theme-color" content="#FFFFFF">
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" href="./icon-192.png">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Валюты">
+<style>
+:root{
+  --bg:#FFFFFF;
+  --pill:#E9E9EB;
+  --pill-press:#DCDCDF;
+  --active-bg:#CBE2FB;
+  --active-tx:#1668D6;
+  --text:#111;
+  --muted:#8A8A8E;
+  --green-bg:#D8EDDA;
+  --green-tx:#1E5B2A;
+  --orange:#F6A21E;
+  --blue:#1668D6;
+  --ok:#1F9D3A;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+html,body{height:100%;overflow:hidden}
+body{
+  background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  display:flex;flex-direction:column;
+  padding:calc(env(safe-area-inset-top) + 8px) 14px calc(env(safe-area-inset-bottom) + 8px);
+  max-width:560px;margin:0 auto;
+}
+
+/* ── Шапка ── */
+header{display:flex;align-items:center;justify-content:space-between;padding:6px 2px 10px;flex-shrink:0}
+.title h1{font-size:22px;font-weight:700;letter-spacing:-.02em}
+.title .upd{font-size:13px;color:var(--ok);font-weight:600;margin-top:1px}
+.title .upd.stale{color:var(--muted)}
+.hbtns{display:flex;gap:6px}
+.hbtn{
+  background:none;border:none;cursor:pointer;color:var(--blue);
+  width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:12px;
+}
+.hbtn:active{background:var(--pill)}
+.hbtn svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.hbtn .filled{fill:currentColor;stroke:none}
+.hbtn.spin svg{animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Строки валют ── */
+.rows{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;gap:9px;padding:2px 0 8px}
+.row{display:flex;gap:9px;flex-shrink:0}
+.ccy{
+  display:flex;align-items:center;gap:8px;
+  background:var(--pill);border-radius:18px;padding:0 16px 0 10px;
+  height:62px;flex-shrink:0;cursor:pointer;
+}
+.ccy:active{background:var(--pill-press)}
+.flag{font-size:26px;line-height:1}
+.code{font-size:17px;font-weight:700}
+.val{
+  flex:1;min-width:0;
+  background:var(--pill);border-radius:18px;height:62px;
+  display:flex;align-items:center;justify-content:flex-end;
+  padding:0 18px;cursor:pointer;
+  font-variant-numeric:tabular-nums;
+  font-size:clamp(20px,6.2vw,30px);font-weight:500;
+  overflow:hidden;white-space:nowrap;
+}
+.val span{overflow:hidden;text-overflow:ellipsis}
+.row.active .val{background:var(--active-bg);color:var(--active-tx)}
+.expr{font-size:.62em;color:var(--active-tx);opacity:.65;margin-right:8px;font-weight:600}
+
+/* ── Клавиатура ── */
+.pad{
+  flex-shrink:0;
+  display:grid;grid-template-columns:repeat(4,1fr);
+  gap:9px;padding-top:6px;
+}
+.key{
+  border:none;border-radius:999px;
+  height:min(64px,9.5vh);
+  font-size:27px;font-weight:500;cursor:pointer;
+  background:var(--pill);color:var(--text);
+  font-family:inherit;
+  display:flex;align-items:center;justify-content:center;
+  transition:filter .06s;
+}
+.key:active{filter:brightness(.9)}
+.key.fn{background:var(--green-bg);color:var(--green-tx);font-weight:600}
+.key.op{background:var(--orange);color:#fff;font-weight:600}
+.key.zero{grid-column:span 2}
+.key svg{width:26px;height:26px;stroke:currentColor;stroke-width:2.4;fill:none;stroke-linecap:round;stroke-linejoin:round}
+
+/* ── Справочник ── */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.32);display:none;align-items:flex-end;justify-content:center;z-index:10}
+.modal.open{display:flex}
+.sheet{
+  background:var(--bg);width:100%;max-width:560px;
+  border-radius:20px 20px 0 0;max-height:84vh;
+  display:flex;flex-direction:column;animation:up .2s ease-out;
+  padding-bottom:env(safe-area-inset-bottom);
+  box-shadow:0 -6px 30px rgba(0,0,0,.18);
+}
+@keyframes up{from{transform:translateY(40px);opacity:.5}to{transform:none;opacity:1}}
+.sheet-head{padding:18px 18px 10px;display:flex;align-items:center;justify-content:space-between}
+.sheet-head b{font-size:17px;font-weight:700}
+.btn-close{background:var(--pill);border:none;color:var(--muted);width:32px;height:32px;border-radius:50%;font-size:16px;cursor:pointer}
+.search{
+  margin:0 16px 12px;padding:12px 15px;
+  background:var(--pill);border:none;border-radius:12px;
+  color:var(--text);font-size:16px;outline:none;width:calc(100% - 32px);
+  user-select:text;-webkit-user-select:text;
+}
+.list{overflow-y:auto;padding:0 8px 24px;-webkit-overflow-scrolling:touch}
+.item{display:flex;align-items:center;gap:12px;padding:12px 12px;border-radius:12px;cursor:pointer}
+.item:active{background:var(--pill)}
+.item .flag{font-size:24px;width:30px;text-align:center}
+.item-meta{flex:1;min-width:0}
+.item .code{font-size:15px}
+.item .cname{font-size:12px;color:var(--muted)}
+.item-rate{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.check{
+  width:24px;height:24px;border-radius:50%;border:1.5px solid #D2D2D6;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;font-size:13px;color:#fff;
+}
+.item.sel .check{background:var(--blue);border-color:var(--blue)}
+
+.toast{
+  position:fixed;left:50%;top:14px;transform:translateX(-50%);
+  background:#333;color:#fff;padding:10px 18px;border-radius:12px;
+  font-size:14px;z-index:20;opacity:0;pointer-events:none;transition:opacity .25s;white-space:nowrap;
+}
+.toast.show{opacity:1}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="title">
+    <h1>Валюты</h1>
+    <div class="upd" id="updText">загрузка…</div>
+  </div>
+  <div class="hbtns">
+    <button class="hbtn" id="btnRefresh" title="Обновить курсы">
+      <svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5" class="filled" stroke="none" fill="currentColor" transform="scale(0.001)"/><polyline points="20 4 20 9 15 9"/></svg>
+    </button>
+    <button class="hbtn" id="btnDir" title="Справочник валют">
+      <svg viewBox="0 0 24 24"><path d="M3 21h18M4 18h16M6 18v-7M10 18v-7M14 18v-7M18 18v-7M3 8l9-5 9 5z"/></svg>
+    </button>
+  </div>
+</header>
+
+<div class="rows" id="rows"></div>
+
+<div class="pad" id="pad">
+  <button class="key fn" data-k="C">C</button>
+  <button class="key fn" data-k="bs"><svg viewBox="0 0 24 24"><path d="M20 12H5"/><path d="M11 6l-6 6 6 6"/></svg></button>
+  <button class="key fn" data-k="%">%</button>
+  <button class="key op" data-k="/">÷</button>
+  <button class="key" data-k="7">7</button>
+  <button class="key" data-k="8">8</button>
+  <button class="key" data-k="9">9</button>
+  <button class="key op" data-k="*">×</button>
+  <button class="key" data-k="4">4</button>
+  <button class="key" data-k="5">5</button>
+  <button class="key" data-k="6">6</button>
+  <button class="key op" data-k="-">−</button>
+  <button class="key" data-k="1">1</button>
+  <button class="key" data-k="2">2</button>
+  <button class="key" data-k="3">3</button>
+  <button class="key op" data-k="+">+</button>
+  <button class="key zero" data-k="0">0</button>
+  <button class="key" data-k=",">,</button>
+  <button class="key op" data-k="=">=</button>
+</div>
+
+<div class="modal" id="modal">
+  <div class="sheet">
+    <div class="sheet-head">
+      <b>Справочник валют</b>
+      <button class="btn-close" id="btnClose">✕</button>
+    </div>
+    <input class="search" id="search" type="search" placeholder="Поиск: код или название" autocomplete="off">
+    <div class="list" id="list"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+
+/* ── Справочник: русские названия и флаги ── */
+const CCY = {
+  USD:['Доллар США','🇺🇸'], EUR:['Евро','🇪🇺'], GEL:['Грузинский лари','🇬🇪'], RUB:['Российский рубль','🇷🇺'],
+  GBP:['Фунт стерлингов','🇬🇧'], CHF:['Швейцарский франк','🇨🇭'], JPY:['Японская иена','🇯🇵'], CNY:['Китайский юань','🇨🇳'],
+  TRY:['Турецкая лира','🇹🇷'], AMD:['Армянский драм','🇦🇲'], AZN:['Азербайджанский манат','🇦🇿'], KZT:['Казахстанский тенге','🇰🇿'],
+  UAH:['Украинская гривна','🇺🇦'], BYN:['Белорусский рубль','🇧🇾'], UZS:['Узбекский сум','🇺🇿'], KGS:['Киргизский сом','🇰🇬'],
+  TJS:['Таджикский сомони','🇹🇯'], TMT:['Туркменский манат','🇹🇲'], MDL:['Молдавский лей','🇲🇩'], ILS:['Израильский шекель','🇮🇱'],
+  AED:['Дирхам ОАЭ','🇦🇪'], THB:['Тайский бат','🇹🇭'], INR:['Индийская рупия','🇮🇳'], KRW:['Южнокорейская вона','🇰🇷'],
+  PLN:['Польский злотый','🇵🇱'], CZK:['Чешская крона','🇨🇿'], HUF:['Венгерский форинт','🇭🇺'], RON:['Румынский лей','🇷🇴'],
+  BGN:['Болгарский лев','🇧🇬'], RSD:['Сербский динар','🇷🇸'], SEK:['Шведская крона','🇸🇪'], NOK:['Норвежская крона','🇳🇴'],
+  DKK:['Датская крона','🇩🇰'], CAD:['Канадский доллар','🇨🇦'], AUD:['Австралийский доллар','🇦🇺'], NZD:['Новозеландский доллар','🇳🇿'],
+  SGD:['Сингапурский доллар','🇸🇬'], HKD:['Гонконгский доллар','🇭🇰'], TWD:['Тайваньский доллар','🇹🇼'], MYR:['Малайзийский ринггит','🇲🇾'],
+  IDR:['Индонезийская рупия','🇮🇩'], VND:['Вьетнамский донг','🇻🇳'], PHP:['Филиппинское песо','🇵🇭'], EGP:['Египетский фунт','🇪🇬'],
+  SAR:['Саудовский риял','🇸🇦'], QAR:['Катарский риал','🇶🇦'], MXN:['Мексиканское песо','🇲🇽'], BRL:['Бразильский реал','🇧🇷'],
+  ARS:['Аргентинское песо','🇦🇷'], ZAR:['Южноафриканский рэнд','🇿🇦'], MAD:['Марокканский дирхам','🇲🇦'], TND:['Тунисский динар','🇹🇳'],
+  LKR:['Шри-ланкийская рупия','🇱🇰'], MNT:['Монгольский тугрик','🇲🇳'], ISK:['Исландская крона','🇮🇸'], MKD:['Македонский денар','🇲🇰'],
+  ALL:['Албанский лек','🇦🇱'], BAM:['Боснийская марка','🇧🇦'], CUP:['Кубинское песо','🇨🇺'], DOP:['Доминиканское песо','🇩🇴'],
+  CLP:['Чилийское песо','🇨🇱'], COP:['Колумбийское песо','🇨🇴'], PEN:['Перуанский соль','🇵🇪'], PKR:['Пакистанская рупия','🇵🇰'],
+  BDT:['Бангладешская така','🇧🇩'], NPR:['Непальская рупия','🇳🇵'], KWD:['Кувейтский динар','🇰🇼'], BHD:['Бахрейнский динар','🇧🇭'],
+  OMR:['Оманский риал','🇴🇲'], JOD:['Иорданский динар','🇯🇴'], LBP:['Ливанский фунт','🇱🇧'], IRR:['Иранский риал','🇮🇷'],
+  NGN:['Нигерийская найра','🇳🇬'], KES:['Кенийский шиллинг','🇰🇪'], GHS:['Ганский седи','🇬🇭'], ETB:['Эфиопский быр','🇪🇹'],
+};
+const nameOf = c => (CCY[c]||[c,''])[0] || c;
+const flagOf = c => (CCY[c]||['','🏳️'])[1] || '🏳️';
+
+/* ── Состояние ── */
+const LS_SEL='vc_selected', LS_RATES='vc_rates';
+let selected = JSON.parse(localStorage.getItem(LS_SEL)||'null') || ['GEL','USD','RUB','EUR'];
+let rates=null, ratesMeta=null;
+let activeCode = selected[1] || selected[0];
+
+/* Калькулятор: acc (op) entry */
+let acc=null, op=null, entry='26', fresh=true;
+
+const $=id=>document.getElementById(id);
+const rowsEl=$('rows'), updEl=$('updText'), listEl=$('list');
+
+/* ── Форматирование ── */
+function fmt(v){
+  if(v==null || !isFinite(v)) return '';
+  const a=Math.abs(v);
+  const d = a===0?0 : a<0.01?6 : a<1?4 : 2;
+  return v.toLocaleString('ru-RU',{minimumFractionDigits:0,maximumFractionDigits:d});
+}
+function fmtEntry(s){ // «сырой» ввод: 1234,5 → 1 234,5
+  if(s==='') return '0';
+  let [i,f]=s.split(',');
+  const neg = i.startsWith('-'); if(neg) i=i.slice(1);
+  i = i.replace(/\B(?=(\d{3})+(?!\d))/g,'\u2009');
+  return (neg?'−':'')+i+(f!==undefined?','+f:'');
+}
+const entryNum = ()=> entry===''?0:parseFloat(entry.replace(',','.'))||0;
+
+/* ── Значение активной валюты ── */
+function currentValue(){ // число в активной валюте
+  if(entry!=='' || acc===null) return entryNum();
+  return acc;
+}
+const OPSYM={'+':'+','-':'−','*':'×','/':'÷'};
+
+/* ── Курсы ── */
+async function fetchERAPI(){
+  const r=await fetch('https://open.er-api.com/v6/latest/USD');
+  const d=await r.json();
+  if(d.result!=='success') throw new Error('er-api fail');
+  return {rates:d.rates, ts:d.time_last_update_unix*1000, provider:'ExchangeRate-API'};
+}
+async function fetchCBR(){
+  const r=await fetch('https://www.cbr-xml-daily.ru/daily_json.js');
+  const d=await r.json();
+  const v=d.Valute;
+  const rubPerUsd=v.USD.Value/v.USD.Nominal;
+  const out={USD:1, RUB:rubPerUsd};
+  for(const k in v){ out[k]=rubPerUsd/(v[k].Value/v[k].Nominal); }
+  return {rates:out, ts:Date.parse(d.Date), provider:'ЦБ РФ'};
+}
+async function loadRates(force){
+  const cached=JSON.parse(localStorage.getItem(LS_RATES)||'null');
+  if(cached && !force && Date.now()-cached.ts<3*3600e3){ apply(cached,true); return; }
+  $('btnRefresh').classList.add('spin');
+  try{
+    let data;
+    try{ data=await fetchERAPI(); }catch(e){ data=await fetchCBR(); }
+    localStorage.setItem(LS_RATES, JSON.stringify(data));
+    apply(data,true);
+  }catch(e){
+    if(cached){ apply(cached,false); toast('Нет сети — курсы из кэша'); }
+    else{ updEl.textContent='нет данных'; updEl.classList.add('stale'); toast('Не удалось загрузить курсы'); }
+  }finally{
+    $('btnRefresh').classList.remove('spin');
+  }
+}
+function apply(data,freshLoad){
+  rates=data.rates; ratesMeta=data;
+  const age=Date.now()-data.ts;
+  let label;
+  if(age<90*60e3) label='Только что';
+  else{
+    const dt=new Date(data.ts);
+    label='Курс на '+dt.toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit'})+' '+dt.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
+  }
+  updEl.textContent=label;
+  updEl.classList.toggle('stale', age>26*3600e3);
+  render();
+}
+
+/* ── Отрисовка ── */
+function render(){
+  rowsEl.innerHTML='';
+  const cur=currentValue();
+  const usd = (rates && rates[activeCode]!=null) ? cur/rates[activeCode] : null;
+  for(const code of selected){
+    const row=document.createElement('div');
+    row.className='row'+(code===activeCode?' active':'');
+    let inner;
+    if(code===activeCode){
+      const exprHtml = (acc!==null&&op) ? '<span class="expr">'+fmt(acc)+' '+OPSYM[op]+'</span>' : '';
+      const shown = entry!=='' ? fmtEntry(entry) : fmt(acc??0);
+      inner = exprHtml+'<span>'+shown+'</span>';
+    }else{
+      const v=(usd!=null && rates[code]!=null)? usd*rates[code] : null;
+      inner='<span>'+(v==null?'—':fmt(v))+'</span>';
+    }
+    row.innerHTML =
+      '<div class="ccy"><span class="flag">'+flagOf(code)+'</span><span class="code">'+code+'</span></div>'+
+      '<div class="val">'+inner+'</div>';
+    row.addEventListener('click', ()=>activate(code));
+    rowsEl.appendChild(row);
+  }
+}
+function activate(code){
+  if(code===activeCode) return;
+  // переносим текущее значение в новую валюту (конвертированное), ввод начнётся заново
+  const cur=currentValue();
+  let converted=cur;
+  if(rates && rates[activeCode]!=null && rates[code]!=null){
+    converted = cur/rates[activeCode]*rates[code];
+  }
+  activeCode=code;
+  acc=null; op=null; fresh=true;
+  entry = numToEntry(converted);
+  render();
+}
+function numToEntry(v){
+  if(!isFinite(v)) return '0';
+  let s=(Math.round(v*1e6)/1e6).toString();
+  return s.replace('.',',').replace('-','-');
+}
+
+/* ── Логика калькулятора ── */
+function press(k){
+  if(k>='0'&&k<='9'){
+    if(fresh){ entry=''; fresh=false; }
+    if(entry.replace(/[-,]/g,'').length>=12) return;
+    if(entry==='0') entry=k; else entry+=k;
+  }
+  else if(k===','){
+    if(fresh){ entry='0'; fresh=false; }
+    if(entry==='') entry='0';
+    if(!entry.includes(',')) entry+=',';
+  }
+  else if(k==='C'){ acc=null; op=null; entry='0'; fresh=true; }
+  else if(k==='bs'){
+    if(fresh){ entry='0'; fresh=true; }
+    else{
+      entry=entry.slice(0,-1);
+      if(entry===''||entry==='-') entry='0', fresh=true;
+    }
+  }
+  else if(k==='%'){
+    const v = (acc!==null&&op) ? acc*entryNum()/100 : entryNum()/100;
+    entry=numToEntry(v); fresh=true;
+  }
+  else if(k==='+'||k==='-'||k==='*'||k==='/'){
+    if(acc!==null && op && !fresh){ acc=calc(acc,op,entryNum()); }
+    else if(acc===null){ acc=entryNum(); }
+    op=k; entry=''; fresh=true;
+  }
+  else if(k==='='){
+    if(acc!==null && op){
+      const res=calc(acc,op,entryNum());
+      acc=null; op=null; entry=numToEntry(res); fresh=true;
+    }
+  }
+  render();
+}
+function calc(a,o,b){
+  let r;
+  switch(o){ case '+': r=a+b; break; case '-': r=a-b; break;
+    case '*': r=a*b; break; case '/': r=b===0?0:a/b; break; }
+  return Math.round(r*1e8)/1e8;
+}
+document.querySelectorAll('.key').forEach(b=>{
+  b.addEventListener('click', ()=>press(b.dataset.k));
+});
+// физическая клавиатура (если открыто на десктопе)
+window.addEventListener('keydown', e=>{
+  const map={'Enter':'=','=':'=','Backspace':'bs','Delete':'C','Escape':'C','.':',',',':',','%':'%','+':'+','-':'-','*':'*','/':'/'};
+  if(e.key>='0'&&e.key<='9') press(e.key);
+  else if(map[e.key]!==undefined){ e.preventDefault(); press(map[e.key]); }
+});
+
+/* ── Справочник ── */
+function openModal(){ $('modal').classList.add('open'); $('search').value=''; buildList(''); }
+function buildList(q){
+  q=q.trim().toLowerCase();
+  listEl.innerHTML='';
+  if(!rates) return;
+  const codes=Object.keys(rates).sort((a,b)=>{
+    const sa=selected.includes(a), sb=selected.includes(b);
+    if(sa!==sb) return sa?-1:1;
+    return a.localeCompare(b);
+  });
+  for(const code of codes){
+    const nm=nameOf(code);
+    if(q && !code.toLowerCase().includes(q) && !nm.toLowerCase().includes(q)) continue;
+    const sel=selected.includes(code);
+    const it=document.createElement('div');
+    it.className='item'+(sel?' sel':'');
+    it.innerHTML =
+      '<div class="flag">'+flagOf(code)+'</div>'+
+      '<div class="item-meta"><div class="code">'+code+'</div><div class="cname">'+nm+'</div></div>'+
+      '<div class="item-rate">1 USD = '+fmt(rates[code])+'</div>'+
+      '<div class="check">✓</div>';
+    it.addEventListener('click', ()=>{
+      if(selected.includes(code)){
+        if(selected.length<=2){ toast('Минимум две валюты'); return; }
+        selected=selected.filter(c=>c!==code);
+        if(activeCode===code){ activeCode=selected[0]; acc=null; op=null; entry='0'; fresh=true; }
+      }else{
+        selected.push(code);
+      }
+      localStorage.setItem(LS_SEL, JSON.stringify(selected));
+      it.classList.toggle('sel');
+      render();
+    });
+    listEl.appendChild(it);
+  }
+}
+
+/* ── Toast ── */
+let toastT;
+function toast(msg){
+  const t=$('toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),2200);
+}
+
+/* ── События шапки ── */
+$('btnRefresh').addEventListener('click', ()=>loadRates(true));
+$('btnDir').addEventListener('click', openModal);
+$('btnClose').addEventListener('click', ()=>$('modal').classList.remove('open'));
+$('modal').addEventListener('click', e=>{ if(e.target.id==='modal') $('modal').classList.remove('open'); });
+$('search').addEventListener('input', e=>buildList(e.target.value));
+
+/* ── Старт ── */
+entry='0'; fresh=true;
+render();
+loadRates(false);
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('./sw.js').catch(()=>{});
+}
+</script>
+</body>
+</html>
