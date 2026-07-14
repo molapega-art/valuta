@@ -259,8 +259,12 @@ const rowsEl=$('rows'), updEl=$('updText'), listEl=$('list');
 /* ── Форматирование ── */
 function fmt(v){
   if(v==null || !isFinite(v)) return '';
+  return v.toLocaleString('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+function fmtRate(v){ // для справочника — точнее
+  if(v==null || !isFinite(v)) return '';
   const a=Math.abs(v);
-  const d = a===0?0 : a<0.01?6 : a<1?4 : 2;
+  const d = a<0.01?6 : a<1?4 : 2;
   return v.toLocaleString('ru-RU',{minimumFractionDigits:0,maximumFractionDigits:d});
 }
 function fmtEntry(s){ // «сырой» ввод: 1234,5 → 1 234,5
@@ -404,8 +408,8 @@ function activate(code){
 }
 function numToEntry(v){
   if(!isFinite(v)) return '0';
-  let s=(Math.round(v*1e6)/1e6).toString();
-  return s.replace('.',',').replace('-','-');
+  let s=(Math.round(v*100)/100).toString();
+  return s.replace('.',',');
 }
 
 /* ── Логика калькулятора ── */
@@ -481,7 +485,7 @@ function buildList(q){
     it.innerHTML =
       '<div class="flag">'+flagOf(code)+'</div>'+
       '<div class="item-meta"><div class="code">'+code+'</div><div class="cname">'+nm+'</div></div>'+
-      '<div class="item-rate">1 USD = '+fmt(rates[code])+'</div>'+
+      '<div class="item-rate">1 USD = '+fmtRate(rates[code])+'</div>'+
       '<div class="check">✓</div>';
     it.addEventListener('click', ()=>{
       if(selected.includes(code)){
