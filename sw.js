@@ -1,4 +1,4 @@
-const CACHE = 'vc-v4';
+const CACHE = 'vc-v5';
 const SHELL = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {

@@ -132,6 +132,14 @@ header{display:flex;align-items:center;justify-content:space-between;padding:6px
 }
 .item.sel .check{background:var(--blue);border-color:var(--blue)}
 
+.src-item{display:flex;align-items:center;gap:12px;padding:14px 12px;border-radius:12px;cursor:pointer}
+.src-item:active{background:var(--pill)}
+.src-ico{font-size:24px;width:32px;text-align:center}
+.src-meta{flex:1}
+.src-name{font-size:15px;font-weight:600}
+.src-desc{font-size:12px;color:var(--muted);margin-top:1px}
+.radio{width:22px;height:22px;border-radius:50%;border:2px solid #D2D2D6;flex-shrink:0}
+.src-item.sel .radio{border:7px solid var(--blue)}
 .toast{
   position:fixed;left:50%;top:14px;transform:translateX(-50%);
   background:#333;color:#fff;padding:10px 18px;border-radius:12px;
@@ -152,8 +160,11 @@ header{display:flex;align-items:center;justify-content:space-between;padding:6px
     <button class="hbtn" id="btnRefresh" title="Обновить курсы">
       <svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5" class="filled" stroke="none" fill="currentColor" transform="scale(0.001)"/><polyline points="20 4 20 9 15 9"/></svg>
     </button>
-    <button class="hbtn" id="btnDir" title="Справочник валют">
+    <button class="hbtn" id="btnSrc" title="Источник курса">
       <svg viewBox="0 0 24 24"><path d="M3 21h18M4 18h16M6 18v-7M10 18v-7M14 18v-7M18 18v-7M3 8l9-5 9 5z"/></svg>
+    </button>
+    <button class="hbtn" id="btnDir" title="Справочник валют">
+      <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
     </button>
   </div>
 </header>
@@ -190,6 +201,16 @@ header{display:flex;align-items:center;justify-content:space-between;padding:6px
     </div>
     <input class="search" id="search" type="search" placeholder="Поиск: код или название" autocomplete="off">
     <div class="list" id="list"></div>
+  </div>
+</div>
+
+<div class="modal" id="srcModal">
+  <div class="sheet">
+    <div class="sheet-head">
+      <b>Источник курса</b>
+      <button class="btn-close" id="btnSrcClose">✕</button>
+    </div>
+    <div class="list" id="srcList" style="padding-bottom:28px"></div>
   </div>
 </div>
 
@@ -258,12 +279,42 @@ function currentValue(){ // число в активной валюте
 }
 const OPSYM={'+':'+','-':'−','*':'×','/':'÷'};
 
-/* ── Курсы ── */
+/* ── Источники курсов ── */
+const LS_SRC='vc_source';
+const SOURCES={
+  market:{ico:'📈',name:'Рынок',desc:'Coinbase · почти реальное время · 600+ валют',ttl:10*60e3},
+  nbg:{ico:'🏛️',name:'Нацбанк Грузии',desc:'Официальный курс лари · обновление раз в день',ttl:3*3600e3},
+  cbr:{ico:'🏦',name:'ЦБ РФ',desc:'Официальный курс рубля · обновление раз в день',ttl:3*3600e3},
+  erapi:{ico:'🌐',name:'ExchangeRate-API',desc:'Агрегатор центробанков · раз в сутки · 160+ валют',ttl:3*3600e3},
+};
+let source = localStorage.getItem(LS_SRC) || 'market';
+if(!SOURCES[source]) source='market';
+
+async function fetchMarket(){
+  const r=await fetch('https://api.coinbase.com/v2/exchange-rates?currency=USD');
+  const d=await r.json();
+  const raw=d.data.rates, out={};
+  for(const k in raw){ const v=parseFloat(raw[k]); if(isFinite(v)&&v>0) out[k]=v; }
+  if(!out.GEL) throw new Error('market no GEL');
+  return {rates:out, ts:Date.now(), provider:'Рынок', src:'market'};
+}
+async function fetchNBG(){
+  const r=await fetch('https://nbg.gov.ge/gw/api/ct/monetarypolicy/currencies/en/json');
+  const d=await r.json();
+  const cur=d[0].currencies;
+  let gelPerUsd=null;
+  const perGel={};
+  for(const c of cur){ perGel[c.code]=c.rate/c.quantity; if(c.code==='USD') gelPerUsd=c.rate/c.quantity; }
+  if(!gelPerUsd) throw new Error('nbg no usd');
+  const out={USD:1, GEL:gelPerUsd};
+  for(const code in perGel){ out[code]=gelPerUsd/perGel[code]; }
+  return {rates:out, ts:Date.parse(d[0].date)||Date.now(), provider:'НБГ', src:'nbg'};
+}
 async function fetchERAPI(){
   const r=await fetch('https://open.er-api.com/v6/latest/USD');
   const d=await r.json();
   if(d.result!=='success') throw new Error('er-api fail');
-  return {rates:d.rates, ts:d.time_last_update_unix*1000, provider:'ExchangeRate-API'};
+  return {rates:d.rates, ts:d.time_last_update_unix*1000, provider:'ExchangeRate-API', src:'erapi'};
 }
 async function fetchCBR(){
   const r=await fetch('https://www.cbr-xml-daily.ru/daily_json.js');
@@ -272,34 +323,44 @@ async function fetchCBR(){
   const rubPerUsd=v.USD.Value/v.USD.Nominal;
   const out={USD:1, RUB:rubPerUsd};
   for(const k in v){ out[k]=rubPerUsd/(v[k].Value/v[k].Nominal); }
-  return {rates:out, ts:Date.parse(d.Date), provider:'ЦБ РФ'};
+  return {rates:out, ts:Date.parse(d.Date), provider:'ЦБ РФ', src:'cbr'};
 }
+const FETCHERS={market:fetchMarket, nbg:fetchNBG, cbr:fetchCBR, erapi:fetchERAPI};
 async function loadRates(force){
-  const cached=JSON.parse(localStorage.getItem(LS_RATES)||'null');
-  if(cached && !force && Date.now()-cached.ts<3*3600e3){ apply(cached,true); return; }
+  const cached=JSON.parse(localStorage.getItem(LS_RATES+'_'+source)||'null');
+  if(cached && !force && Date.now()-cached.fetchedAt<SOURCES[source].ttl){ apply(cached); return; }
   $('btnRefresh').classList.add('spin');
   try{
-    let data;
-    try{ data=await fetchERAPI(); }catch(e){ data=await fetchCBR(); }
-    localStorage.setItem(LS_RATES, JSON.stringify(data));
-    apply(data,true);
+    const data=await FETCHERS[source]();
+    data.fetchedAt=Date.now();
+    localStorage.setItem(LS_RATES+'_'+source, JSON.stringify(data));
+    apply(data);
   }catch(e){
-    if(cached){ apply(cached,false); toast('Нет сети — курсы из кэша'); }
-    else{ updEl.textContent='нет данных'; updEl.classList.add('stale'); toast('Не удалось загрузить курсы'); }
+    if(cached){ apply(cached); toast('Нет сети — курсы из кэша'); }
+    else{
+      // фолбэк на любой другой источник
+      let ok=false;
+      for(const s of ['market','erapi','cbr']){
+        if(s===source) continue;
+        try{ const d=await FETCHERS[s](); d.fetchedAt=Date.now(); apply(d); toast(SOURCES[source].name+' недоступен — курс: '+d.provider); ok=true; break; }catch(_){}
+      }
+      if(!ok){ updEl.textContent='нет данных'; updEl.classList.add('stale'); toast('Не удалось загрузить курсы'); }
+    }
   }finally{
     $('btnRefresh').classList.remove('spin');
   }
 }
-function apply(data,freshLoad){
+function apply(data){
   rates=data.rates; ratesMeta=data;
   const age=Date.now()-data.ts;
-  let label;
-  if(age<90*60e3) label='Только что';
+  let when;
+  if(age<3*60e3) when='только что';
+  else if(age<60*60e3) when=Math.round(age/60e3)+' мин назад';
   else{
     const dt=new Date(data.ts);
-    label='Курс на '+dt.toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit'})+' '+dt.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
+    when='на '+dt.toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit'})+(data.src==='market'?' '+dt.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}):'');
   }
-  updEl.textContent=label;
+  updEl.textContent=data.provider+' · '+when;
   updEl.classList.toggle('stale', age>26*3600e3);
   render();
 }
@@ -444,6 +505,29 @@ function toast(msg){
   const t=$('toast'); t.textContent=msg; t.classList.add('show');
   clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),2200);
 }
+
+/* ── Выбор источника ── */
+function openSrc(){
+  const L=$('srcList'); L.innerHTML='';
+  for(const key in SOURCES){
+    const s=SOURCES[key];
+    const it=document.createElement('div');
+    it.className='src-item'+(key===source?' sel':'');
+    it.innerHTML='<div class="src-ico">'+s.ico+'</div>'+
+      '<div class="src-meta"><div class="src-name">'+s.name+'</div><div class="src-desc">'+s.desc+'</div></div>'+
+      '<div class="radio"></div>';
+    it.addEventListener('click', ()=>{
+      source=key; localStorage.setItem(LS_SRC,key);
+      $('srcModal').classList.remove('open');
+      loadRates(false);
+    });
+    L.appendChild(it);
+  }
+  $('srcModal').classList.add('open');
+}
+$('btnSrc').addEventListener('click', openSrc);
+$('btnSrcClose').addEventListener('click', ()=>$('srcModal').classList.remove('open'));
+$('srcModal').addEventListener('click', e=>{ if(e.target.id==='srcModal') $('srcModal').classList.remove('open'); });
 
 /* ── События шапки ── */
 $('btnRefresh').addEventListener('click', ()=>loadRates(true));
